@@ -1,4 +1,4 @@
-function [t , Ca, L, I, R_a] = Simulation(varargin)
+function [t , Ca, L, I, R_a] = GPCR_negative_feedback_simulation(varargin)
     %% parameters    
     
     %General consts   
@@ -7,6 +7,9 @@ function [t , Ca, L, I, R_a] = Simulation(varargin)
         
         %1 = only our model. 2 = including previous H.H model for AWA
         model_type                          =   1;
+        
+        %show output. 1 = show, 0 = don't show
+        show_output                         =   true;
         
         %ending time of simulation in mili seconds
         t_end                               =   100000;
@@ -42,7 +45,7 @@ function [t , Ca, L, I, R_a] = Simulation(varargin)
     %           5 = multi_steps
     %           6 = exponential
         gradType                            =   2;    
-        baseline                            =   0.1150; %in uM   
+        baseline                            =   DAMToUM(10^-8);     
         ts                                  =   10000; 
         tf                                  =   100000; 
         lin_slope                           =   1150/1000000;
@@ -61,6 +64,7 @@ function [t , Ca, L, I, R_a] = Simulation(varargin)
         
     addOptional(p,'ez',ez);
     addOptional(p,'model_type',model_type);
+    addOptional(p,'show_output',show_output);
     addOptional(p,'t_end',t_end);
     addOptional(p,'time_track',time_track);
     addOptional(p,'calcium_decay_time_const',t_c);
@@ -85,8 +89,8 @@ function [t , Ca, L, I, R_a] = Simulation(varargin)
     addOptional(p,'step_duration',step_duration);
     addOptional(p,'break_duration',break_duration);
     
-    addOptional(p,'K5',K5);
-    addOptional(p,'K6',K6);
+    addOptional(p,'calcium_dependent_inhibition_coeff',K5);
+    addOptional(p,'calcium_independent_inhibition_coeff',K6);
     addOptional(p,'inhibition_decay_time_const',t_I);
 
     addOptional(p,'c_current',c_current);
@@ -96,6 +100,7 @@ function [t , Ca, L, I, R_a] = Simulation(varargin)
     
     ez              = p.Results.ez;
     model_type      = p.Results.model_type;
+    show_output     = p.Results.show_output;
     t_end           = p.Results.t_end;
     time_track      = p.Results.time_track;
     ourparams(3)    = p.Results.calcium_decay_time_const; 
@@ -115,8 +120,8 @@ function [t , Ca, L, I, R_a] = Simulation(varargin)
     ourparams(37)   = p.Results.step_duration; 
     ourparams(38)   = p.Results.break_duration; 
     
-    ourparams(41)   = p.Results.K5; 
-    ourparams(42)   = p.Results.K6;
+    ourparams(41)   = p.Results.calcium_dependent_inhibition_coeff; 
+    ourparams(42)   = p.Results.calcium_independent_inhibition_coeff;
     ourparams(43)   = p.Results.inhibition_decay_time_const; 
 
     ourparams(51)   = p.Results.critic_receptor_activation;
@@ -289,7 +294,6 @@ function [t , Ca, L, I, R_a] = Simulation(varargin)
             S(ii+1)                 =   curr_S; 
             if (model_type == 2)
                 V(ii+1)             =   curr_V;
-                %gating_params(ii+1,:) =   curr_gating_params;
                 E_C(ii+1)           =   curr_E_C;
             end
         end
@@ -309,46 +313,47 @@ function [t , Ca, L, I, R_a] = Simulation(varargin)
     S                               =   S(~isnan(S));
     if (model_type == 2)
         V                           =   V(~isnan(V));
-        %gating_params              =   gating_params(1:length(t),:);
         E_C                         =   E_C(~isnan(E_C));
     end
     
     %% drawing the data from simulation
-    subplot(12,1,1:2);
-    plot(t/1000,L*10^-3,'LineWidth', 1.5, 'Color', 'r'); 
-    ylabel({'Ligand' , '[mM]'});
-    ylim([-0.2*max(L*10^-3),1.2*max(L*10^-3)]);
-    xlim([min(t/1000) max(t/1000)]);
-    set(gca,'FontSize',16);
-    set(gca,'XTickLabel',[]);
-    ax = gca;
-    ax.XGrid = 'on';
-    ax.YGrid = 'of';
+    if show_output
+        subplot(12,1,1:2);
+        plot(t/1000,L*10^-3,'LineWidth', 1.5, 'Color', 'r'); 
+        ylabel({'Ligand' , '[mM]'});
+        ylim([-0.2*max(L*10^-3),1.2*max(L*10^-3)]);
+        xlim([min(t/1000) max(t/1000)]);
+        set(gca,'FontSize',16);
+        set(gca,'XTickLabel',[]);
+        ax = gca;
+        ax.XGrid = 'on';
+        ax.YGrid = 'of';
 
-    subplot(12,1,3:7); 
-    plot(t/1000,Ca*10^6,'LineWidth', 1.5, 'Color', 'b'); 
-    ylabel({'Calcium conc.','[\muM]'});
-    ylim([-0.1*max(Ca*10^6),1.1*max(Ca*10^6)]);
-    xlim([min(t/1000) max(t/1000)]);
-    set(gca,'FontSize',16);
-    set(gca,'XTickLabel',[]);
-    ax = gca;
-    ax.XGrid = 'on';
-    ax.YGrid = 'of';
+        subplot(12,1,3:7); 
+        plot(t/1000,Ca*10^6,'LineWidth', 1.5, 'Color', 'b'); 
+        ylabel({'Calcium conc.','[\muM]'});
+        ylim([-0.1*max(Ca*10^6),1.1*max(Ca*10^6)]);
+        xlim([min(t/1000) max(t/1000)]);
+        set(gca,'FontSize',16);
+        set(gca,'XTickLabel',[]);
+        ax = gca;
+        ax.XGrid = 'on';
+        ax.YGrid = 'of';
 
-    subplot(12,1,8:12); 
-    yyaxis right; plot(t/1000,I,'LineWidth', 1.5); 
-    ylabel('Inhibition');
-    ylim([-0.03*max(I),1.03*max(I)]);
-    yyaxis left; plot(t/1000,R_a,'LineWidth', 1.5);
-    ylabel('Receptor Activation');
-    ylim([-0.05,1.05]);
-    xlabel('Time [Sec]');
-    xlim([min(t/1000) max(t/1000)]);
-    set(gca,'FontSize',16);
-    ax = gca;
-    ax.XGrid = 'on';
-    ax.YGrid = 'of';
+        subplot(12,1,8:12); 
+        yyaxis right; plot(t/1000,I,'LineWidth', 1.5); 
+        ylabel('Inhibition');
+        ylim([-0.03*max(I),1.03*max(I)]);
+        yyaxis left; plot(t/1000,R_a,'LineWidth', 1.5);
+        ylabel('Receptor Activation');
+        ylim([-0.05,1.05]);
+        xlabel('Time [Sec]');
+        xlim([min(t/1000) max(t/1000)]);
+        set(gca,'FontSize',16);
+        ax = gca;
+        ax.XGrid = 'on';
+        ax.YGrid = 'of';
+    end
     %% main model function
     function [d_Ca_dt, d_I_dt, d_S_dt] = fullModel(curr_Ca, curr_R_a, curr_S,curr_I, ourparams)
     
@@ -536,7 +541,7 @@ function [t , Ca, L, I, R_a] = Simulation(varargin)
             %Tau_Ka = Tau_Ka_1 + (Tau_Ka_2 - Tau_Ka_1)*m_inf(V,V_Ka_2,deltaV_Ka_2);
             %d_Ka_dt = simple_gating_dynamics(V,curr_Ka,Tau_Ka,V_Ka_1,deltaV_Ka_1);  
 
-        %this is how it appears in the old simulation code
+        %this is how it appears in their simulation code
             Tau_Ka = Tau_Ka_1 + (Tau_Ka_2 - Tau_Ka_1)*0.5*(1+tanh(V-V_Ka_1)/deltaV_Ka_1);    
             d_Ka_dt = simple_gating_dynamics(V,curr_Ka,Tau_Ka,V_Ka_2,2);  
     end
@@ -576,7 +581,8 @@ function [t , Ca, L, I, R_a] = Simulation(varargin)
         %     Ca_inf = m_inf(V,V_C1,deltaV_C1);
         %     Ci_inf = (2/C0)*m_inf(V,V_C2,deltaV_C2);
         %     d_C1_dt = (Ca_inf*Ci_inf*(1-curr_C2) - curr_C1)/Tau_C1 - (curr_C1 - curr_C2)/Tau_C2_of_V;
-        %this is how it appears in the old simulation code
+       
+        %this is how it appears in their simulation code
             T2 = 80*(1/cosh((V-23)/(2*24)));                                                    
             mx = 3.612/4;
             m1 = m_inf(V,-21.6,9.17);
@@ -598,7 +604,7 @@ function [t , Ca, L, I, R_a] = Simulation(varargin)
                     t_center    =   ts + (tf - ts)/2;
                     L_curr      =   baseline + amplitude*(1 + tanh(-3.8*(t_curr - t_center)/(ts - t_center)));
                 case 4 %growing steps
-                    growRatio   =   7;
+                    growRatio   =  7;
                     %ligand_curr = baseline + amplitude*(growRatio^floor((t_curr - ts)/step_duration));
                     L_curr      =   baseline*(growRatio^(1+floor((t_curr - ts)/step_duration)));
                 case 5 %steps - notice that the breaks duration is the same as steps duration
@@ -612,7 +618,25 @@ function [t , Ca, L, I, R_a] = Simulation(varargin)
                     if ((t_curr-ts) < step_duration), L_curr = baseline + amplitude;
                     elseif ((t_curr-ts - step_duration) < break_duration), L_curr = baseline;
                     else, L_curr = baseline + amplitude;
+                    end   
+                 case 8 %multi-step with break
+                    if ((t_curr - ts) < step_duration*(step_num*2 - 1)) 
+                        if     mod(floor((t_curr - ts)/step_duration),2) == 0, L_curr = baseline + amplitude;
+                        elseif mod(floor((t_curr - ts)/step_duration),2) == 1, L_curr = baseline;
+                        end
+                    else
+                        if ((t_curr - ts) < (step_duration*(step_num*2 - 1) + break_duration))
+                            L_curr = baseline;
+                        elseif ((t_curr - ts) < (step_num*step_duration*2 + break_duration))
+                            L_curr = baseline + amplitude;
+                        else
+                            L_curr = baseline;
+                        end
                     end
+                 case 9 %steps - breaks duration is not  the same as steps duration
+                    if     mod((t_curr - ts),(step_duration + break_duration)) < step_duration, L_curr = baseline + amplitude;
+                    elseif mod((t_curr - ts),(step_duration + break_duration)) >= step_duration, L_curr = baseline;
+                    end    
             end
         else
             L_curr = baseline;
@@ -629,5 +653,13 @@ function [t , Ca, L, I, R_a] = Simulation(varargin)
                                                 calcium_independent_inhibition_coeff,inhibition_decay_time_const , Ca_0,curr_I,curr_R_a)
         d_I_dt = calcium_dependent_inhibition_coeff * (curr_Ca - Ca_0)*(curr_R_a) + ...
                  calcium_independent_inhibition_coeff*(curr_R_a) - (1/inhibition_decay_time_const)*curr_I*(1-(curr_R_a));
+    end
+
+    function [ uM ] = DAMToUM( volumeFraction )
+        DA_MW = 86.09; %gram/mol;
+        DA_Density = 0.990*1000; %gram/liter;
+        pureDA_UM = DA_Density/DA_MW*10^6;
+
+        uM = pureDA_UM*volumeFraction;
     end
 end
